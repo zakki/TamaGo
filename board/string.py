@@ -1,29 +1,59 @@
 """連の定義と処理の実装。
 """
 from typing import Callable, List
-from board.constant import STRING_END, LIBERTY_END, NEIGHBOR_END, OB_SIZE
+
+import cython
+
+from board.constant import STRING_END, LIBERTY_END, NEIGHBOR_END, OB_SIZE, BOARD_SIZE
 from board.coordinate import Coordinate
 from board.stone import Stone
 from common.print_console import print_err
 
+
+@cython.cclass
 class String: # pylint: disable=R0902
     """連の実装クラス。
     """
+
+    board_max = cython.declare(cython.int, visibility='public')
+    lib = cython.declare(cython.int[11 ** 2], visibility='public')
+    neighbor_max = cython.declare(cython.int, visibility='public')
+    neighbor = cython.declare(cython.int[62], visibility='public')
+    color = cython.declare(cython.object, visibility='public')
+    libs = cython.declare(cython.int, visibility='public')
+    neighbors = cython.declare(cython.int, visibility='public')
+    origin = cython.declare(cython.int, visibility='public')
+    size = cython.declare(cython.int, visibility='public')
+    flag = cython.declare(cython.int, visibility='public')
+
     def __init__(self, board_size: int):
         """連クラスのコンストラクタ。
 
         Args:
             board_size (int): 碁盤のサイズ。
         """
-        self.color = Stone.EMPTY
+        self.board_max = ((board_size + 2) ** 2)
+        assert self.board_max == 11 ** 2
+        self.color = 0
         self.libs = 0
-        self.lib = [0] * ((board_size + 2) ** 2)
+        # self.lib = [0] * ((board_size + 2) ** 2)
+        for i in range(self.board_max):
+            self.lib[i] = 0
         self.neighbors = 0
-        self.neighbor = [0] * int(0.8 * board_size * (board_size - 1) + 5)
+        # self.neighbor = [0] * int(0.8 * board_size * (board_size - 1) + 5)
+        self.neighbor_max = 62
+        assert self.neighbor_max == int(0.8 * board_size * (board_size - 1) + 5)
+        for i in range(self.neighbor_max):
+            self.neighbor[i] = 0
         self.origin = 0
         self.size = 0
         self.flag = False
 
+
+    @cython.ccall
+    # @cython.locals(pos=cython.int, i=cython.int)
+    @cython.locals(i=cython.int)
+    @cython.returns(cython.void)
     def initialize(self, pos: int, color: Stone) -> None:
         """連の生成処理。
 
@@ -31,10 +61,10 @@ class String: # pylint: disable=R0902
             pos (int): 連を構成する石の座標。
             color (Stone): 連を構成する石の色。
         """
-        for i, _ in enumerate(self.lib):
+        for i in range(self.board_max):
             self.lib[i] = 0
 
-        for i, _ in enumerate(self.neighbor):
+        for i in range(self.neighbor_max):
             self.neighbor[i] = 0
 
         self.color = color
@@ -247,9 +277,19 @@ class String: # pylint: disable=R0902
         return neighbors
 
 
+@cython.cclass
 class StringData:
+    # string_id = cython.declare(cython.int[(BOARD_SIZE + OB_SIZE * 2) ** 2], visibility='private')
+    board_max = cython.declare(cython.int, visibility='public')
+    string = cython.declare(cython.list, visibility='public')
+    string_id = cython.declare(cython.int[11 ** 2], visibility='public')
+    string_next = cython.declare(cython.int[11 ** 2], visibility='public')
+    board_size = cython.declare(cython.int, visibility='public')
+    POS = cython.declare(cython.object, visibility='public')
+    get_neighbor4 = cython.declare(cython.object, visibility='public')
     """碁盤上の全ての連を管理するクラス
     """
+    # @cython.ccall
     def __init__(self, board_size: int, pos_func: Callable[[int, int], int], \
         get_neighbor4: Callable[[int], List[int]]):
         """コンストラクタ。
@@ -257,11 +297,15 @@ class StringData:
         Args:
             board_size (int): 碁盤のサイズ。
         """
-        board_max = (board_size + OB_SIZE * 2) ** 2
+        self.board_max = (board_size + OB_SIZE * 2) ** 2
         self.string = [String(board_size=board_size) \
             for i in range(int(0.8 * board_size * (board_size - 1) + 5))]
-        self.string_id = [0] * board_max
-        self.string_next = [0] * board_max
+        # self.string_id = [0] * board_max
+        for i in range(self.board_max):
+            self.string_id[i] = 0
+        # self.string_next = [0] * self.board_max
+        for i in range(self.board_max):
+            self.string_next[i] = 0
         self.board_size = board_size
         self.POS = pos_func # pylint: disable=C0103
         self.get_neighbor4 = get_neighbor4
@@ -269,8 +313,10 @@ class StringData:
     def clear(self) -> None:
         """全ての連を削除する。
         """
-        self.string_id = [0] * len(self.string_id)
-        self.string_next = [0] * len(self.string_next)
+        # self.string_id = [0] * len(self.string_id)
+        for i in range(self.board_max):
+            self.string_id[i] = 0
+            self.string_next[i] = 0
         for string in self.string:
             string.remove()
 
@@ -364,6 +410,11 @@ class StringData:
         """
         return self.string[self.get_id(pos)].get_num_liberties()
 
+
+    @cython.ccall
+    @cython.locals(lib_add=cython.int)
+    @cython.locals(string_id=cython.int)
+    @cython.returns(cython.void)
     def make_string(self, board: List[Stone], pos: int, color: Stone) -> None:
         """連を作成する。
 
@@ -597,6 +648,9 @@ class StringData:
                 print_err(f"\tNeighbor {len(neighbors)} : {neighbors}")
 
 
+@cython.ccall
+@cython.locals(i=cython.int)
+@cython.returns(cython.void)
 def copy_string(dst: String, src: String) -> None:
     """連の情報をコピーする。
 
@@ -606,14 +660,21 @@ def copy_string(dst: String, src: String) -> None:
     """
     dst.color = src.color
     dst.libs = src.libs
-    dst.lib = src.lib[:]
+    # dst.lib = src.lib[:]
+    for i in range(src.board_max):
+        dst.lib[i] = src.lib[i]
     dst.neighbors = src.neighbors
-    dst.neighbor = src.neighbor[:]
+    # dst.neighbor = src.neighbor[:]
+    for i in range(src.neighbor_max):
+        dst.neighbor[i] = src.neighbor[i]
     dst.origin = src.origin
     dst.size = src.size
     dst.flag = src.flag
 
 
+@cython.ccall
+@cython.locals(i=cython.int)
+@cython.returns(cython.void)
 def copy_strings(dst: StringData, src: StringData) -> None:
     """全ての連の情報をコピーする。ただし、存在しない場合は存在フラグをオフにするだけにする。
 
@@ -621,8 +682,10 @@ def copy_strings(dst: StringData, src: StringData) -> None:
         dst (StringData): コピー先の連データ。
         src (StringData): コピー元の連データ。
     """
-    dst.string_id = src.string_id[:]
-    dst.string_next = src.string_next[:]
+    # dst.string_id = src.string_id[:]
+    for i in range(src.board_max):
+        dst.string_id[i] = src.string_id[i]
+        dst.string_next[i] = src.string_next[i]
 
     for i, string in enumerate(src.string):
         if string.exist():

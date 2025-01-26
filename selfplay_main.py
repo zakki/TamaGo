@@ -2,6 +2,7 @@
 """
 import glob
 import math
+import multiprocessing
 import os
 import threading
 import time
@@ -54,6 +55,8 @@ def selfplay_main(save_dir: str, process: int, num_data: int, size: int, \
     os.mkdir(os.path.join(save_dir, str(kifu_dir_index)))
 
     print(f"Self play visits : {visits}")
+
+    # multiprocessing.set_start_method('spawn')
 
     with ProcessPoolExecutor(max_workers=process) as executor:
         futures = [executor.submit(selfplay_worker, os.path.join(save_dir, str(kifu_dir_index)), \

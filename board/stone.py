@@ -1,8 +1,8 @@
 """交点の状態（色）の定数と処理定義。
 """
-from enum import Enum
+from enum import IntEnum
 
-class Stone(Enum):
+class Stone(IntEnum):
     """石の色を表すクラス。
     """
     EMPTY = 0

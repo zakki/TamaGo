@@ -1,6 +1,8 @@
 """配石パターンの実装。
 """
 from typing import Callable, List, NoReturn
+
+import cython
 import numpy as np
 
 from board.constant import OB_SIZE
@@ -30,9 +32,69 @@ for i, _ in enumerate(nb4_empty):
         nb4_empty[i] += 1
 
 
+@cython.cfunc
+@cython.returns(cython.void)
+def init_eye_table(eye: cython.char[65536]) -> None:
+    # 眼のパターン
+    eye_pat3 = [
+        # +OO     XOO     +O+     XO+
+        # O*O     O*O     O*O     O*O
+        # OOO     OOO     OOO     OOO
+        0x5554, 0x5556, 0x5544, 0x5546,
+
+        # +OO     XOO     +O+     XO+
+        # O*O     O*O     O*O     O*O
+        # OO+     OO+     OO+     OO+
+        0x1554, 0x1556, 0x1544, 0x1546,
+
+        # +OX     XO+     +OO     OOO
+        # O*O     O*O     O*O     O*O
+        # OO+     +O+     ###     ###
+        0x1564, 0x1146, 0xFD54, 0xFD55,
+
+        # +O#     OO#     XOX     XOX
+        # O*#     O*#     O+O     O+O
+        # ###     ###     OOO     ###
+        0xFF74, 0xFF75, 0x5566, 0xFD66,
+
+        # OOX     OOO     XOO     XO#
+        # O*O     O*O     O*O     O*#
+        # XOO     XOX     ###     ###
+        0x5965, 0x9955, 0xFD56, 0xFF76,
+    ]
+
+    # eye = [Stone.EMPTY] * 65536
+    for i in range(65536):
+        eye[i] = int(Stone.EMPTY)
+
+    # OOO
+    # O*O
+    # OOO
+    eye[0x5555] = int(Stone.BLACK)
+    eye[pat3_reverse(0x5555)] = int(Stone.WHITE)
+
+    # +O+
+    # O*O
+    # +O+
+    eye[0x1144] = int(Stone.BLACK)
+    eye[pat3_reverse(0x1144)] = int(Stone.WHITE)
+
+    for eye_pat in eye_pat3:
+        sym_eye_pat = get_pat3_symmetry8(eye_pat)
+        for pat3 in sym_eye_pat:
+            eye[pat3] = int(Stone.BLACK)
+            eye[pat3_reverse(pat3)] = int(Stone.WHITE)
+
+
+@cython.cclass
 class Pattern:
     """配石パターンクラス。
     """
+    board_size: int
+    pat3: np.ndarray
+    POS: Callable[[int, int], int]
+    update_pos: List[int]
+
     def __init__(self, board_size: int, pos_func: Callable[[int, int], int]):
         """Patternクラスのコンストラクタ。
 
@@ -48,55 +110,6 @@ class Pattern:
             -board_size_with_ob - 1, -board_size_with_ob, -board_size_with_ob + 1,
             -1, 1, board_size_with_ob - 1, board_size_with_ob, board_size_with_ob + 1
         ]
-
-        # 眼のパターン
-        eye_pat3 = [
-            # +OO     XOO     +O+     XO+
-            # O*O     O*O     O*O     O*O
-            # OOO     OOO     OOO     OOO
-            0x5554, 0x5556, 0x5544, 0x5546,
-
-            # +OO     XOO     +O+     XO+
-            # O*O     O*O     O*O     O*O
-            # OO+     OO+     OO+     OO+
-            0x1554, 0x1556, 0x1544, 0x1546,
-
-            # +OX     XO+     +OO     OOO
-            # O*O     O*O     O*O     O*O
-            # OO+     +O+     ###     ###
-            0x1564, 0x1146, 0xFD54, 0xFD55,
-
-            # +O#     OO#     XOX     XOX
-            # O*#     O*#     O+O     O+O
-            # ###     ###     OOO     ###
-            0xFF74, 0xFF75, 0x5566, 0xFD66,
-
-            # OOX     OOO     XOO     XO#
-            # O*O     O*O     O*O     O*#
-            # XOO     XOX     ###     ###
-            0x5965, 0x9955, 0xFD56, 0xFF76,
-        ]
-
-        self.eye = [Stone.EMPTY] * 65536
-
-        # OOO
-        # O*O
-        # OOO
-        self.eye[0x5555] = Stone.BLACK
-        self.eye[pat3_reverse(0x5555)] = Stone.WHITE
-
-        # +O+
-        # O*O
-        # +O+
-        self.eye[0x1144] = Stone.BLACK
-        self.eye[pat3_reverse(0x1144)] = Stone.WHITE
-
-        for eye_pat in eye_pat3:
-            sym_eye_pat = get_pat3_symmetry8(eye_pat)
-            for pat3 in sym_eye_pat:
-                self.eye[pat3] = Stone.BLACK
-                self.eye[pat3_reverse(pat3)] = Stone.WHITE
-
         self.clear()
 
     def clear(self) -> None:
@@ -159,7 +172,7 @@ class Pattern:
         Returns:
             Stone: 眼の色。眼でなければStone.EMPTY。
         """
-        return self.eye[self.pat3[pos]]
+        return eye[self.pat3[pos]]
 
     def display(self, pos: int) -> None:
         """指定した座標の周囲の石のパターンを表示する。（デバッグ用)
@@ -307,3 +320,7 @@ def copy_pattern(dst: Pattern, src: Pattern) -> None:
         src (Pattern): コピー元の配石パターンのデータ。
     """
     dst.pat3 = src.pat3.copy()
+
+
+eye: cython.uchar[65536] = b"0" * 65536
+init_eye_table(eye)
