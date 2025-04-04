@@ -4,7 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 import glob
 import os
 import random
-from typing import List, NoReturn
+from typing import List
 import numpy as np
 from board.go_board import GoBoard
 from board.stone import Stone
@@ -14,8 +14,8 @@ from sgf.reader import SGFReader
 from learning_param import BATCH_SIZE, DATA_SET_SIZE
 
 
-def _save_data(save_file_path: str, input_data: np.ndarray, policy_data: np.ndarray,\
-    value_data: np.ndarray, kifu_counter: int) -> NoReturn:
+def _save_data(save_file_path: str, input_data: List[np.ndarray], policy_data: List[np.ndarray],\
+    value_data: List[int], kifu_counter: int) -> None:
     """学習データをnpzファイルとして出力する。
 
     Args:
@@ -35,7 +35,7 @@ def _save_data(save_file_path: str, input_data: np.ndarray, policy_data: np.ndar
 
 # pylint: disable=R0914
 def generate_supervised_learning_data(program_dir: str, kifu_dir: str, \
-    board_size: int=9) -> NoReturn:
+    board_size: int=9) -> None:
     """教師あり学習のデータを生成して保存する。
 
     Args:
@@ -124,7 +124,7 @@ def _process_kifu(kifu_path: str, board_size: int) -> tuple:
 
 
 def generate_reinforcement_learning_data(program_dir: str, kifu_dir_list: List[str], \
-    board_size: int=9) -> NoReturn:
+    board_size: int=9) -> None:
     """強化学習で使用するデータを生成し、保存する。
 
     Args:
